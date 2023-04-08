@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja-JP">
+  <head>
+    <meta charset="UTF-8">
+    <title>日本語誤字チェック 設定</title>
+    <link rel="stylesheet" type="text/css" href="./config.css">
+    <script src="./config.js"></script>
+  </head>
+  <body>
+    <h3>日本語誤字チェック 設定</h3>
+    <fieldset>
+      <legend>結果表示モーダルの位置</legend>
+      <div>
+        <input type="radio" name="modal-location" value="" class="jp-corrector-config">
+        <label>選択文字列の近く</label>
+      </div>
+      <div>
+        <input type="radio" name="modal-location" value="top-left" class="jp-corrector-config">
+        <label>画面の左上</label>
+      </div>
+      <div>
+        <input type="radio" name="modal-location" value="top-right" class="jp-corrector-config">
+        <label>画面の右上</label>
+      </div>
+      <div>
+        <input type="radio" name="modal-location" value="bottom-right" class="jp-corrector-config">
+        <label>画面の右下</label>
+      </div>
+      <div>
+        <input type="radio" name="modal-location" value="bottom-left" class="jp-corrector-config">
+        <label>画面の左下</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>誤字チェックモデル</legend>
+      <div>
+        <input type="radio" name="corrector" value="local" class="jp-corrector-config">
+        <label for="local">組み込みJavaScript版(サーバ不要ですが精度はAPI版に劣ります)</label>
+      </div>
+      <div>
+        <input type="radio" name="corrector" value="server" class="jp-corrector-config">
+	<label for="server">API版(高精度ですが<a target="blank" href="https://github.com/nknytk/jp-proofreading-memo">APIサーバ</a>が必要です)</label>
+      </div>
+      <div class="server-config-wrapper">
+        <label class="server-config-textlabel">API URL</label>
+        <input type="text" name="corrector-server-url" class="jp-corrector-config server-config-textinput" id="corrector-server-url">
+      </div>
+      <div class="server-config-wrapper">
+        <label class="server-config-textlabel">APIキー</label>
+        <input type="text" name="corrector-server-apikey" class="jp-corrector-config server-config-textinput" id="corrector-server-apikey">
+      </div>
+    </fieldset>
+  </body>
+</html>

@@ -1,0 +1,69 @@
+.jp-corrector-modal {
+  width: 960px;
+  max-height: 640px;
+  border: 2px solid #AAAAAA;
+  border-radius: 10px;
+  margin: 10px;
+  padding: 5px;
+  background-color: #F0F0F0;
+  font-family: system-ui;
+}
+.jp-corrector-modal-fixed {
+  position: fixed;
+}
+.jp-corrector-modal-absolute {
+  position: absolute;
+}
+.jp-corrector-modal-top-left {
+  top: 0px;
+  left: 0px;
+}
+.jp-corrector-modal-top-right {
+  top: 0px;
+  right: 0px;
+}
+.jp-corrector-modal-bottom-right {
+  bottom: 0px;
+  right: 0px;
+}
+.jp-corrector-modal-bottom-left {
+  bottom: 0px;
+  left: 0px;
+}
+.jp-corrector-modal-hidden {
+  visibility: hidden;
+}
+.jp-corrector-modal-visible {
+  visibility: visible;
+}
+
+.jp-corrector-modal-title {
+  margin: 5px;
+  padding: 5px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.jp-corrector-modal-text {
+  background-color: #FFFFE7;
+  overflow: auto;
+  margin: 5px;
+  padding: 5px;
+  font-size: 16px;
+}
+.jp-corrector-modal-button {
+  margin: 5px;
+  font-size: 16px;
+  color: #FFFFFF;
+  background-color: #2E8B57;
+  padding: 5px;
+  border-radius: 4px;
+}	
+
+.jp-corrector-modal-deleted {
+  text-decoration: line-through;
+  background-color: #FFC0C0;
+}
+.jp-corrector-modal-replaced {
+  background-color: #C0FFC0;
+}

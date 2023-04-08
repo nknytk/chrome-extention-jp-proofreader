@@ -1,0 +1,11 @@
+.server-config-wrapper {
+  margin-left: 30px;
+}
+.server-config-textinput {
+  width: 300px;
+}
+.server-config-textlabel {
+  display: block;
+  float: left;
+  width: 70px;
+}
