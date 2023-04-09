@@ -80,7 +80,7 @@ class CorrectionModalManager {
     this.numRows = numRows
     this.numCorrectedRows = 0
     this.currentIdx = 0
-    this.lastCorrectedIdx = -1
+    this.lastCorrectedIdx = 0
     this.modalAttention.innerText = '処理中 0%'
   }
 
@@ -108,6 +108,7 @@ class CorrectionModalManager {
     }
     if (!isCorrected) return
 
+    this.numCorrectedRows++
     if (this.currentIdx > this.lastCorrectedIdx + 1) {
       const skippedRow = document.createElement('div')
       skippedRow.innerText = '...'
@@ -116,7 +117,7 @@ class CorrectionModalManager {
     this.lastCorrectedIdx = this.currentIdx
 
     const row = document.createElement('div')
-    for (let part of correctionResult.diffs) {
+    for (let part of correctionResult.diff) {
       const partSpan = document.createElement('span')
       if (part.op == null) {
         partSpan.innerText = part.to
