@@ -9,7 +9,7 @@ class CorrectionModalManager {
     this.modalDiv = document.createElement('div')
     this.modalDiv.setAttribute('id', 'jp-corrector-modal')
     this.modalDiv.classList.add('jp-corrector-modal')
-    this.modalDiv.classList.add('jp-corrector-modal-hidden')
+    this.modalDiv.classList.add('hidden')
     this.modalTitle = document.createElement('h4')
     this.modalTitle.innerText = '校正提案'
     this.modalTitle.classList.add('jp-corrector-modal-title')
@@ -17,6 +17,11 @@ class CorrectionModalManager {
     this.modalContent = document.createElement('div')
     this.modalContent.classList.add('jp-corrector-modal-text')
     this.modalDiv.appendChild(this.modalContent)
+    this.modalAttention = document.createElement('div')
+    this.modalAttention.setAttribute('id', 'jp-corrector-modal-attention')
+    this.modalAttention.classList.add('jp-corrector-modal-attention')
+    this.modalAttention.classList.add('hidden')
+    this.modalDiv.appendChild(this.modalAttention)
     this.modalCloseButton = document.createElement('button')
     this.modalCloseButton.classList.add('jp-corrector-modal-button')
     this.modalCloseButton.innerText = '閉じる'
@@ -61,69 +66,91 @@ class CorrectionModalManager {
       this.modalDiv.classList.add(`jp-corrector-modal-absolute`)
     }
 
-    // 本文をLoadingにしてモーダルを可視化
+    // 表示内容を初期化してモーダルを可視化
     for (let c of this.modalContent.children) c.remove()
-    this.modalContent.innerText = 'Loading...'
-    this.modalDiv.classList.remove('jp-corrector-modal-hidden')
-    this.modalDiv.classList.add('jp-corrector-modal-visible')
+    this.modalContent.innerText = ''
+    this.modalAttention.innerText = '初期化中...'
+    this.modalAttention.classList.remove('hidden')
+    this.modalAttention.classList.add('visible')
+    this.modalDiv.classList.remove('hidden')
+    this.modalDiv.classList.add('visible')
   }
 
-  set(correctionResults) {
-    const corrected = []
-    for (let i = 0; i < correctionResults.length; i++) {
-      for (let diff of correctionResults[i].diff) {
-        if (diff.op) {
-          corrected.push({index: i, diffs: correctionResults[i].diff})
-          break
-        }
-      }
-    }
+  startProcessing(numRows) {
+    this.numRows = numRows
+    this.numCorrectedRows = 0
+    this.currentIdx = 0
+    this.lastCorrectedIdx = -1
+    this.modalAttention.innerText = '処理中 0%'
+  }
 
-    if (corrected.length == 0) {
+  endProcessing() {
+    this.modalAttention.innerText = ''
+    this.modalAttention.classList.remove('visible')
+    this.modalAttention.classList.add('hidden')
+
+    if (this.numCorrectedRows == 0) {
       this.modalContent.innerText = '校正提案はありません'
-      return
     }
+  }
 
-    this.modalContent.innerText = ''
-    let currentIdx = 0
-    for (let correction of corrected) {
-      if (correction.index > currentIdx + 1) {
-        const skippedRow = document.createElement('div')
-        skippedRow.innerText = '...'
-        this.modalContent.appendChild(skippedRow)
-      }
+  addResult(correctionResult) {
+    this.currentIdx += 1
+    const progressPercent = parseInt(100 * this.currentIdx / this.numRows)
+    this.modalAttention.innerText = `処理中 ${progressPercent}%`
 
-      const row = document.createElement('div')
-      for (let part of correction.diffs) {
-        const partSpan = document.createElement('span')
-        if (part.op == null) {
-          partSpan.innerText = part.to
-          row.appendChild(partSpan)
-        } else if (part.op == 'delete') {
-          const partFrom = document.createElement('span')
-          partFrom.innerText = part.from
-          partFrom.classList.add('jp-corrector-modal-deleted')
-          row.appendChild(partFrom)
-        } else if (part.op == 'replace') {
-          const partFrom = document.createElement('span')
-          const partTo = document.createElement('span')
-          partFrom.innerText = part.from
-          partFrom.classList.add('jp-corrector-modal-deleted')
-          partTo.innerText = part.to
-          partTo.classList.add('jp-corrector-modal-replaced')
-          row.appendChild(partFrom)
-          row.appendChild(partTo)
-        }
+    let isCorrected = false
+    for (let diff of correctionResult.diff) {
+      if (diff.op) {
+        isCorrected = true
+        break
       }
-      this.modalContent.appendChild(row)
-      currentIdx = correction.index
     }
+    if (!isCorrected) return
+
+    if (this.currentIdx > this.lastCorrectedIdx + 1) {
+      const skippedRow = document.createElement('div')
+      skippedRow.innerText = '...'
+      this.modalContent.appendChild(skippedRow)
+    }
+    this.lastCorrectedIdx = this.currentIdx
+
+    const row = document.createElement('div')
+    for (let part of correctionResult.diffs) {
+      const partSpan = document.createElement('span')
+      if (part.op == null) {
+        partSpan.innerText = part.to
+        row.appendChild(partSpan)
+      } else if (part.op == 'delete') {
+        const partFrom = document.createElement('span')
+        partFrom.innerText = part.from
+        partFrom.classList.add('jp-corrector-modal-deleted')
+        row.appendChild(partFrom)
+      } else if (part.op == 'replace') {
+        const partFrom = document.createElement('span')
+        const partTo = document.createElement('span')
+        partFrom.innerText = part.from
+        partFrom.classList.add('jp-corrector-modal-deleted')
+        partTo.innerText = part.to
+        partTo.classList.add('jp-corrector-modal-replaced')
+        row.appendChild(partFrom)
+        row.appendChild(partTo)
+      }
+    }
+    this.modalContent.appendChild(row)
+  }
+
+  addError(errorMessage) {
+    this.modalAttention.innerText = `エラーが発生しました: ${errorMessage}`
   }
 
   close() {
     const modal = document.getElementById('jp-corrector-modal')
-    modal.classList.remove('jp-corrector-modal-visible')
-    modal.classList.add('jp-corrector-modal-hidden')
+    modal.classList.remove('visible')
+    modal.classList.add('hidden')
+    const modalAttention = document.getElementById('jp-corrector-modal-attention')
+    modalAttention.classList.remove('visible')
+    modalAttention.classList.add('hidden')
   }
 }
 
@@ -178,24 +205,31 @@ function getText(element, valueOnly=false) {
 
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request == "openCorrectionModal") {
-    // 訂正結果モーダルを準備してLoading Spinnerを表示する
+  if (request == "getSelectedText") {
+    // 保存しておいた文字列をservice workerに送り返す
+    if (selectionType == 'node') setSelection(selectedElement)
+    sendResponse({value: selectedText})
+    return true
+  }
+
+  if (request == "openCorrectionModal") {  // モーダルを開いて初期化
     if (correctionModalManager == null) correctionModalManager = new CorrectionModalManager()
     chrome.storage.local.get(['modalLocation']).then(config => {
       if (config.modalLocation == null) config.modalLocation = ''
       correctionModalManager.open(config.modalLocation)
-      sendResponse({})
     })
-  } else if (request == "getSelectedText") {
-    // 保存しておいた文字列をservice workerに送り返す
-    if (selectionType == 'node') setSelection(selectedElement)
-    sendResponse({value: selectedText})
-  } else if (request.startsWith('correctionResult:')) {
-    // 訂正結果モーダルに処理結果を表示
+  } else if (request.startsWith('startProcessing:')) {  // モーダルを処理中にする
+    const numRows = parseInt(request.slice('startProcessing:'.length, request.length))
+    correctionModalManager.startProcessing(numRows)
+  } else if (request.startsWith('correctionResult:')) {  // 処理結果をモーダルに追加
     const correctionResult = JSON.parse(request.slice('correctionResult:'.length, request.length))
-    correctionModalManager.set(correctionResult)
-    sendResponse({})
+    correctionModalManager.addResult(correctionResult)
+  } else if (request == 'finishedProcessing') {  // モーダルを処理完了にする
+    correctionModalManager.endProcessing()
+  } else if (request.startsWith('error:')) {  // エラー内容を表示
+    correctionModalManager.addError(request.slice('error:'.length, request.length))
   }
+  sendResponse({})
   return true
 })
 

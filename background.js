@@ -23,21 +23,40 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   chrome.tabs.sendMessage(tab.id, 'openCorrectionModal', () => {})
   // 選択された文字列をタブ側に要求する
   chrome.tabs.sendMessage(tab.id, 'getSelectedText', async function(response) {
-    // タブから受け取った文字列に対して日本語校正を行い、結果をタブに送り返す
-    if ((!response) || (!response.value)) return
-    let corrector = null
-    const config = await chrome.storage.local.get(['corrector', 'serverUrl', 'apiKey'])
-    if (config.corrector == 'server') {
-      if (remoteCorrector == null) remoteCorrector = new RemoteCorrector(config.serverUrl, config.apiKey)
-      corrector = remoteCorrector
-    } else {
-      if (localCorrector == null) localCorrector = await LocalCorrector.create(modelFileUrl, charMappingFileUrl)
-      corrector = localCorrector
+    // 選択文字列を取得できなかったら即終了
+    if ((!response) || (!response.value)) {
+      chrome.tabs.sendMessage(tab.id, 'finishedProcessing', () => {})
+      return
     }
-    if (localCorrector == null) localCorrector = await LocalCorrector.create(modelFileUrl, charMappingFileUrl)
-    const correctionResult = await corrector.process(response.value)
-    const messageContent = 'correctionResult:' + JSON.stringify(correctionResult)
-    chrome.tabs.sendMessage(tab.id, messageContent, () => {})
+
+    try {
+      // 校正器の取得
+      let corrector = null
+      const config = await chrome.storage.local.get(['corrector', 'serverUrl', 'apiKey'])
+      if (config.corrector == 'server') {
+        if (remoteCorrector == null) remoteCorrector = new RemoteCorrector(config.serverUrl, config.apiKey)
+        corrector = remoteCorrector
+      } else {
+        if (localCorrector == null) localCorrector = await LocalCorrector.create(modelFileUrl, charMappingFileUrl)
+        corrector = localCorrector
+      }
+
+      // タブから受け取った文字列に対して日本語校正を行い、結果をタブに送り返す
+      const rows = splitText(response.value, corrector.maxLength)
+      chrome.tabs.sendMessage(tab.id, `startProcessing:${rows.length}`, () => {})
+      for (let row of rows) {
+        const correctionResult = await corrector.process(row)
+        const messageContent = 'correctionResult:' + JSON.stringify(correctionResult)
+        chrome.tabs.sendMessage(tab.id, messageContent, () => {})
+      }
+      chrome.tabs.sendMessage(tab.id, 'finishedProcessing', () => {})
+    } catch (e) {
+      if (e.stack) {
+        chrome.tabs.sendMessage(tab.id, 'error:' + e.stack, () => {})
+      } else {
+        chrome.tabs.sendMessage(tab.id, 'error:' + e.message, () => {})
+      }
+    }
   })
 })
 
@@ -47,18 +66,27 @@ class RemoteCorrector {
   constructor(serverUrl, apiKey) {
     this.serverUrl = serverUrl
     this.apiKey = apiKey
+    this.minLength = 6
     this.maxLength = 150
+    this.resultCache = {}
   }
 
-  async process(text) {
-    const results = []
-    for (let row of splitText(text, this.maxLength)) {
-      let url = `${this.serverUrl}?text=${encodeURIComponent(row)}&apikey=${encodeURIComponent(this.apiKey)}`
-      const response = await (await fetch(url)).json()
-      const result = {original: row, normalized: response.input, output: response.output, diff: response.tokens}
-      results.push(result)
+  async process(row) {
+    // 短すぎる文字列は訂正対象外として、受け取った文字列をそのまま返す
+    if (row.length < this.minLength) {
+      return {original: row, normalized: null, output: row, diff: [{'from': row, 'to': row, 'op': null}]}
     }
-    return results
+    // キャッシュがある場合はキャッシュから結果を返す
+    if (this.resultCache[row] != null) {
+      return this.resultCache[row]
+    }
+
+    // 処理結果をAPIから取得し、キャッシュして返す
+    let url = `${this.serverUrl}?text=${encodeURIComponent(row)}&apikey=${encodeURIComponent(this.apiKey)}`
+    const response = await (await fetch(url)).json()
+    const result = {original: row, normalized: response.input, output: response.output, diff: response.tokens}
+    this.resultCache[row] = result
+    return result
   }
 }
 
@@ -89,36 +117,28 @@ class LocalCorrector {
   }
 
   /* 日本語校正処理本体 */
-  async process(text) {
-    const results = []
-    for (let row of splitText(text, this.maxLength)) {
-      // 短すぎる文字列は訂正対象外として、受け取った文字列をそのまま返す
-      if (row.length < this.minLength) {
-        const result = {original: row, normalized: null, output: row, diff: [{'from': row, 'to': row, 'op': null}]}
-        results.push(result)
-        continue
-      }
-
-      const normalized = this.normalize(row)
-      // キャッシュがある場合はキャッシュから結果を返す
-      if (this.resultCache[normalized] != null) {
-        const result = this.resultCache[normalized]
-        result['original'] = row
-        results.push(result)
-        continue
-      }
-
-      // キャッシュがない場合は処理を行い、結果をキャッシュに登録する
-      const [idVec, attentionMask] = this.encode(normalized)
-      const modelInput = {[this.inputNames[0]]: idVec, [this.inputNames[1]]: attentionMask, [this.inputNames[2]]: this.tokenTypeIds}
-      const rawOutput = await this.ortSession.run(modelInput)
-      const [output, diff] = this.decode([normalized], rawOutput[this.outputName])[0]
-      const result = {original: row, normalized: normalized, output: output, diff: diff}
-      results.push(result)
-      this.resultCache[normalized] = result
+  async process(row) {
+    // 短すぎる文字列は訂正対象外として、受け取った文字列をそのまま返す
+    if (row.length < this.minLength) {
+      return {original: row, normalized: null, output: row, diff: [{'from': row, 'to': row, 'op': null}]}
     }
 
-    return results
+    // キャッシュがある場合はキャッシュから結果を返す
+    const normalized = this.normalize(row)
+    if (this.resultCache[normalized] != null) {
+      const result = this.resultCache[normalized]
+      result['original'] = row
+      return result
+    }
+
+    // キャッシュがない場合は処理を行い、結果をキャッシュに登録して返す
+    const [idVec, attentionMask] = this.encode(normalized)
+    const modelInput = {[this.inputNames[0]]: idVec, [this.inputNames[1]]: attentionMask, [this.inputNames[2]]: this.tokenTypeIds}
+    const rawOutput = await this.ortSession.run(modelInput)
+    const [output, diff] = this.decode([normalized], rawOutput[this.outputName])[0]
+    const result = {original: row, normalized: normalized, output: output, diff: diff}
+    this.resultCache[normalized] = result
+    return result
   }
 
   /* 文字列をID列に変換する */
@@ -242,7 +262,7 @@ function argsort(arr, ascending=true) {
 function splitText(text, maxLength) {
   const sentences = []
   const sentenceEndMarks = ['。', '？', '?', '！', '!', '、']
-  while (text.length > 0) {
+  while ((text.length > 0) || (text.indexOf('。') != -1)) {
     let endIdx = maxLength 
     for (let mark of sentenceEndMarks) {
       const markIdx = text.indexOf(mark)
