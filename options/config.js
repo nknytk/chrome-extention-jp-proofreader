@@ -32,7 +32,7 @@ function setConfig(config) {
   }
 
   if (config.serverUrl) document.getElementById('corrector-server-url').value = config.serverUrl
-  if (config.apiKey) document.getElementById('corrector-server-url').value = config.apiKey
+  if (config.apiKey) document.getElementById('corrector-server-apikey').value = config.apiKey
 }
 
 async function loadConfig() {
