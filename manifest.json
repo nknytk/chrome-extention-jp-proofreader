@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "日本語誤字チェック",
   "description": "日本語文章に対して誤字の修正提案を行う。文字の置換、削除に対応している。文字追加は未対応。",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "permissions": ["contextMenus", "storage"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
